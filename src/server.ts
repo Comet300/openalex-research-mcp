@@ -1529,6 +1529,14 @@ function buildFilter(params: any): FilterOptions {
     filter['cited_by_count'] = `>${params.min_citations - 1}`;
   }
 
+  // Topic ID filters for precise domain filtering
+  if (params.topic_id) {
+    filter['topics.id'] = params.topic_id;
+  }
+  if (params.primary_topic_id) {
+    filter['primary_topic.id'] = params.primary_topic_id;
+  }
+
   console.error('buildFilter result:', JSON.stringify(filter));
   return filter;
 }

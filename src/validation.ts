@@ -16,6 +16,8 @@ export const searchWorksSchema = z.object({
   sort: z.string().optional(),
   page: z.number().positive().optional(),
   per_page: z.number().positive().max(200).optional(),
+  topic_id: z.string().optional(),
+  primary_topic_id: z.string().optional(),
 });
 
 export const getWorkSchema = z.object({
