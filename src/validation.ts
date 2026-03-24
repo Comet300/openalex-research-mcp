@@ -33,6 +33,13 @@ export const searchByTopicSchema = z.object({
   topic: z.string().min(1),
   from_year: z.number().positive().optional(),
   to_year: z.number().positive().optional(),
+  topic_id: z.string().optional(),
+  primary_topic_id: z.string().optional(),
+  source_name: z.string().optional(),
+  source_issn: z.string().optional(),
+  min_citations: z.number().nonnegative().optional(),
+  author_institution: z.string().optional(),
+  institution_group: z.string().optional(),
   sort: z.string().optional(),
   per_page: z.number().positive().max(200).optional(),
 });
@@ -69,6 +76,8 @@ export const getTopCitedWorksSchema = z.object({
   source_name: z.string().optional(),
   source_issn: z.string().optional(),
   source_id: z.string().optional(),
+  topic_id: z.string().optional(),
+  primary_topic_id: z.string().optional(),
   per_page: z.number().positive().max(200).optional(),
 });
 
@@ -106,12 +115,16 @@ export const analyzeTopicTrendsSchema = z.object({
   query: z.string().min(1),
   from_year: z.number().positive().optional(),
   to_year: z.number().positive().optional(),
+  topic_id: z.string().optional(),
+  primary_topic_id: z.string().optional(),
 });
 
 export const compareResearchAreasSchema = z.object({
   topics: z.array(z.string().min(1)).min(2).max(5),
   from_year: z.number().positive().optional(),
   to_year: z.number().positive().optional(),
+  topic_id: z.string().optional(),
+  primary_topic_id: z.string().optional(),
 });
 
 export const getTrendingTopicsSchema = z.object({
@@ -124,6 +137,8 @@ export const analyzeGeographicDistributionSchema = z.object({
   query: z.string().min(1),
   from_year: z.number().positive().optional(),
   to_year: z.number().positive().optional(),
+  topic_id: z.string().optional(),
+  primary_topic_id: z.string().optional(),
 });
 
 export const getEntitySchema = z.object({
@@ -137,6 +152,11 @@ export const searchSourcesSchema = z.object({
   is_oa: z.boolean().optional(),
   works_count: z.string().optional(),
   per_page: z.number().positive().max(200).optional(),
+});
+
+export const findTopicsSchema = z.object({
+  query: z.string().min(1),
+  per_page: z.number().positive().max(50).optional(),
 });
 
 export function validateInput<T>(schema: z.ZodSchema<T>, data: unknown, context: string): T {

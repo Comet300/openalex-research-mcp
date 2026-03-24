@@ -660,6 +660,14 @@ const tools: Tool[] = [
           type: 'number',
           description: 'Results per page, max 200 (default: 10; use 20 for broader coverage)',
         },
+        topic_id: {
+          type: 'string',
+          description: "OpenAlex topic ID (e.g., 'https://openalex.org/T10315' or 'T10315'). Use find_topics to discover IDs. Filters works tagged with this topic.",
+        },
+        primary_topic_id: {
+          type: 'string',
+          description: 'Filter to works where this is the PRIMARY topic (stricter). Use find_topics to discover IDs.',
+        },
       },
     },
   },
@@ -746,6 +754,14 @@ const tools: Tool[] = [
         per_page: {
           type: 'number',
           description: 'Results per page (default: 10, use 20 for broader coverage, max 200)',
+        },
+        topic_id: {
+          type: 'string',
+          description: "OpenAlex topic ID (e.g., 'https://openalex.org/T10315' or 'T10315'). Use find_topics to discover IDs. Filters works tagged with this topic.",
+        },
+        primary_topic_id: {
+          type: 'string',
+          description: 'Filter to works where this is the PRIMARY topic (stricter). Use find_topics to discover IDs.',
         },
       },
       required: ['topic'],
@@ -892,6 +908,14 @@ const tools: Tool[] = [
           type: 'number',
           description: 'Number of top works to return (default: 10, use 20 for broader coverage, max: 200)',
         },
+        topic_id: {
+          type: 'string',
+          description: "OpenAlex topic ID (e.g., 'https://openalex.org/T10315' or 'T10315'). Use find_topics to discover IDs. Filters works tagged with this topic.",
+        },
+        primary_topic_id: {
+          type: 'string',
+          description: 'Filter to works where this is the PRIMARY topic (stricter). Use find_topics to discover IDs.',
+        },
       },
     },
   },
@@ -1032,6 +1056,14 @@ const tools: Tool[] = [
           type: 'number',
           description: 'End year for trend analysis',
         },
+        topic_id: {
+          type: 'string',
+          description: "OpenAlex topic ID (e.g., 'https://openalex.org/T10315' or 'T10315'). Use find_topics to discover IDs. Filters works tagged with this topic.",
+        },
+        primary_topic_id: {
+          type: 'string',
+          description: 'Filter to works where this is the PRIMARY topic (stricter). Use find_topics to discover IDs.',
+        },
       },
       required: ['query'],
     },
@@ -1055,6 +1087,14 @@ const tools: Tool[] = [
         to_year: {
           type: 'number',
           description: 'Compare up to this year',
+        },
+        topic_id: {
+          type: 'string',
+          description: "OpenAlex topic ID (e.g., 'https://openalex.org/T10315' or 'T10315'). Use find_topics to discover IDs. Filters works tagged with this topic.",
+        },
+        primary_topic_id: {
+          type: 'string',
+          description: 'Filter to works where this is the PRIMARY topic (stricter). Use find_topics to discover IDs.',
         },
       },
       required: ['topics'],
@@ -1100,6 +1140,14 @@ const tools: Tool[] = [
         to_year: {
           type: 'number',
           description: 'Analyze up to this year',
+        },
+        topic_id: {
+          type: 'string',
+          description: "OpenAlex topic ID (e.g., 'https://openalex.org/T10315' or 'T10315'). Use find_topics to discover IDs. Filters works tagged with this topic.",
+        },
+        primary_topic_id: {
+          type: 'string',
+          description: 'Filter to works where this is the PRIMARY topic (stricter). Use find_topics to discover IDs.',
         },
       },
       required: ['query'],
