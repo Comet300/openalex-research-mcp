@@ -8,6 +8,18 @@ import { OpenAlexClient, FilterOptions, SearchOptions } from './openalex-client.
 import { CONFIG } from './config.js';
 import { validateInput } from './validation.js';
 
+export function summarizeTopic(topic: any) {
+  return {
+    id: topic.id,
+    display_name: topic.display_name,
+    description: topic.description ?? null,
+    works_count: topic.works_count ?? 0,
+    subfield: topic.subfield?.display_name ?? null,
+    field: topic.field?.display_name ?? null,
+    domain: topic.domain?.display_name ?? null,
+  };
+}
+
 export function createServer(openAlexClient: OpenAlexClient, defaultPageSize: number): Server {
 
 const VENUE_PRESETS: Record<string, {
