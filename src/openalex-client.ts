@@ -1,4 +1,3 @@
-import axios, { AxiosInstance, AxiosError } from 'axios';
 import { CONFIG } from './config.js';
 
 export interface OpenAlexConfig {
@@ -82,45 +81,51 @@ export interface OpenAlexResponse<T> {
 }
 
 export class OpenAlexClient {
-  private client: AxiosInstance;
+  private baseUrl: string;
   private email?: string;
   private apiKey?: string;
+  private userAgent: string;
   private cache: SimpleCache<any>;
   private enableCache: boolean;
 
   constructor(config: OpenAlexConfig = {}) {
-    this.email = config.email || process.env.OPENALEX_EMAIL;
-    this.apiKey = config.apiKey || process.env.OPENALEX_API_KEY;
+    this.email = config.email;
+    this.apiKey = config.apiKey;
     this.enableCache = config.enableCache ?? true;
-
-    const baseUrl = config.baseUrl || CONFIG.API.BASE_URL;
-
-    this.client = axios.create({
-      baseURL: baseUrl,
-      timeout: CONFIG.API.TIMEOUT,
-      headers: {
-        'User-Agent': this.email
-          ? `OpenAlexMCP/1.0 (mailto:${this.email})`
-          : 'OpenAlexMCP/1.0',
-      },
-    });
+    this.baseUrl = config.baseUrl || CONFIG.API.BASE_URL;
+    this.userAgent = this.email
+      ? `OpenAlexMCP/1.0 (mailto:${this.email})`
+      : 'OpenAlexMCP/1.0';
 
     this.cache = new SimpleCache<any>(CONFIG.CACHE.MAX_SIZE, CONFIG.CACHE.TTL_MS);
-
-    // Add response interceptor for error handling and retry
-    this.client.interceptors.response.use(
-      (response) => response,
-      async (error: AxiosError) => {
-        if (error.response?.status === 429) {
-          throw new Error('Rate limit exceeded. Please wait before making more requests.');
-        }
-        throw error;
-      }
-    );
   }
 
   private async sleep(ms: number): Promise<void> {
     return new Promise(resolve => setTimeout(resolve, ms));
+  }
+
+  private async fetchJson(url: string): Promise<any> {
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), CONFIG.API.TIMEOUT);
+
+    try {
+      const response = await fetch(url, {
+        headers: { 'User-Agent': this.userAgent },
+        signal: controller.signal,
+      });
+
+      if (response.status === 429) {
+        throw new Error('Rate limit exceeded. Please wait before making more requests. If running on a shared-IP platform (e.g. Cloudflare Workers), set OPENALEX_API_KEY for reliable access.');
+      }
+
+      if (!response.ok) {
+        throw new Error(`OpenAlex API error: ${response.status} ${response.statusText}`);
+      }
+
+      return await response.json();
+    } finally {
+      clearTimeout(timeoutId);
+    }
   }
 
   private async retryWithBackoff<T>(
@@ -157,9 +162,14 @@ export class OpenAlexClient {
     return this.cache.size;
   }
 
-  /**
-   * Build query parameters from search options
-   */
+  private buildUrl(path: string, queryParams: Record<string, string> = {}): string {
+    const url = new URL(path, this.baseUrl);
+    for (const [key, value] of Object.entries(queryParams)) {
+      url.searchParams.set(key, value);
+    }
+    return url.toString();
+  }
+
   private buildQueryParams(options: SearchOptions = {}): Record<string, string> {
     const params: Record<string, string> = {};
 
@@ -185,8 +195,6 @@ export class OpenAlexClient {
     }
 
     if (options.sort) {
-      // "relevance_score" without a suffix causes 400 errors from OpenAlex
-      // (only :desc is valid for relevance_score). Default to :desc when omitted.
       const sort = options.sort;
       params.sort = sort.includes(':') ? sort : `${sort}:desc`;
     }
@@ -214,30 +222,16 @@ export class OpenAlexClient {
     return params;
   }
 
-  /**
-   * Normalize an entity ID for use in API requests.
-   * - Bare DOIs (e.g. "10.1234/foo") are prefixed with "doi:" so the slash
-   *   is not misinterpreted as a path separator.
-   * - Full URLs (e.g. "https://doi.org/...") are percent-encoded so axios
-   *   does not treat them as absolute URLs.
-   * - OpenAlex IDs (e.g. "W2741809807") and prefixed IDs (e.g. "doi:...")
-   *   are returned as-is.
-   */
   private normalizeId(id: string): string {
-    // Bare DOI: starts with "10." and contains a slash
     if (/^10\.\d{4,9}\//.test(id)) {
       return `doi:${id}`;
     }
-    // Full URL: encode so axios keeps it as a path segment, not an absolute URL
     if (/^https?:\/\//i.test(id)) {
       return encodeURIComponent(id);
     }
     return id;
   }
 
-  /**
-   * Get a single entity by ID
-   */
   async getEntity(entityType: string, id: string): Promise<any> {
     const cacheKey = `${entityType}/${id}`;
 
@@ -254,8 +248,8 @@ export class OpenAlexClient {
       if (this.email && !this.apiKey) params.mailto = this.email;
       if (this.apiKey) params.api_key = this.apiKey;
 
-      const response = await this.client.get(`/${entityType}/${normalizedId}`, { params });
-      return response.data;
+      const url = this.buildUrl(`/${entityType}/${normalizedId}`, params);
+      return await this.fetchJson(url);
     }, `getEntity(${entityType}, ${id})`);
 
     if (this.enableCache) {
@@ -265,9 +259,6 @@ export class OpenAlexClient {
     return result;
   }
 
-  /**
-   * Search/list entities with filters
-   */
   async searchEntities<T = any>(
     entityType: string,
     options: SearchOptions = {}
@@ -283,13 +274,8 @@ export class OpenAlexClient {
     }
 
     const result = await this.retryWithBackoff(async () => {
-      console.error('SearchEntities called:');
-      console.error('  Entity type:', entityType);
-      console.error('  Options:', JSON.stringify(options, null, 2));
-      console.error('  Query params:', JSON.stringify(params, null, 2));
-      const response = await this.client.get(`/${entityType}`, { params });
-      console.error('  Response status:', response.status);
-      return response.data;
+      const url = this.buildUrl(`/${entityType}`, params);
+      return await this.fetchJson(url);
     }, `searchEntities(${entityType})`);
 
     if (this.enableCache) {
@@ -299,9 +285,6 @@ export class OpenAlexClient {
     return result;
   }
 
-  /**
-   * Get autocomplete suggestions
-   */
   async autocomplete(entityType: string, query: string): Promise<any> {
     const cacheKey = `autocomplete/${entityType}?q=${query}`;
 
@@ -317,8 +300,8 @@ export class OpenAlexClient {
       if (this.email && !this.apiKey) params.mailto = this.email;
       if (this.apiKey) params.api_key = this.apiKey;
 
-      const response = await this.client.get(`/autocomplete/${entityType}`, { params });
-      return response.data;
+      const url = this.buildUrl(`/autocomplete/${entityType}`, params);
+      return await this.fetchJson(url);
     }, `autocomplete(${entityType}, ${query})`);
 
     if (this.enableCache) {
@@ -328,9 +311,6 @@ export class OpenAlexClient {
     return result;
   }
 
-  /**
-   * Get random sample of entities
-   */
   async randomSample<T = any>(
     entityType: string,
     count: number,
@@ -342,65 +322,38 @@ export class OpenAlexClient {
     });
   }
 
-  /**
-   * Get works with pagination
-   */
   async getWorks(options: SearchOptions = {}): Promise<OpenAlexResponse<any>> {
     return this.searchEntities('works', options);
   }
 
-  /**
-   * Get a single work by ID or DOI
-   */
   async getWork(id: string): Promise<any> {
     return this.getEntity('works', id);
   }
 
-  /**
-   * Get authors
-   */
   async getAuthors(options: SearchOptions = {}): Promise<OpenAlexResponse<any>> {
     return this.searchEntities('authors', options);
   }
 
-  /**
-   * Get a single author
-   */
   async getAuthor(id: string): Promise<any> {
     return this.getEntity('authors', id);
   }
 
-  /**
-   * Get sources (journals)
-   */
   async getSources(options: SearchOptions = {}): Promise<OpenAlexResponse<any>> {
     return this.searchEntities('sources', options);
   }
 
-  /**
-   * Get institutions
-   */
   async getInstitutions(options: SearchOptions = {}): Promise<OpenAlexResponse<any>> {
     return this.searchEntities('institutions', options);
   }
 
-  /**
-   * Get topics
-   */
   async getTopics(options: SearchOptions = {}): Promise<OpenAlexResponse<any>> {
     return this.searchEntities('topics', options);
   }
 
-  /**
-   * Get publishers
-   */
   async getPublishers(options: SearchOptions = {}): Promise<OpenAlexResponse<any>> {
     return this.searchEntities('publishers', options);
   }
 
-  /**
-   * Get funders
-   */
   async getFunders(options: SearchOptions = {}): Promise<OpenAlexResponse<any>> {
     return this.searchEntities('funders', options);
   }
