@@ -768,6 +768,25 @@ const tools: Tool[] = [
     },
   },
   {
+    name: 'find_topics',
+    description:
+      "Search OpenAlex's topic taxonomy (~4,500 topics organized into subfields, fields, and domains). Returns topic IDs that can be passed to search_works or search_by_topic for precise, noise-free filtering. Use this first when searching for domain-specific literature — e.g., find_topics(\"behavioral economics\") returns topic IDs for decision-making and behavioral economics research. Note: OpenAlex has ~4,500 topics at a moderate granularity level — very specific sub-topics may not have exact matches. Try broader terms if initial queries return no results.",
+    inputSchema: {
+      type: 'object',
+      properties: {
+        query: {
+          type: 'string',
+          description: 'Topic name or keywords (e.g., "behavioral economics", "machine learning")',
+        },
+        per_page: {
+          type: 'number',
+          description: 'Number of results (default 10, max 50)',
+        },
+      },
+      required: ['query'],
+    },
+  },
+  {
     name: 'autocomplete_search',
     description:
       'Fast autocomplete/typeahead search for works, authors, institutions, or other entities. Returns quick suggestions for partial queries.',
@@ -1682,6 +1701,30 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
             {
               type: 'text',
               text: JSON.stringify(summary, null, 2),
+            },
+          ],
+        };
+      }
+
+      case 'find_topics': {
+        const { findTopicsSchema } = await import('./validation.js');
+        const validated = validateInput(findTopicsSchema, params, 'find_topics');
+        const results = await openAlexClient.getTopics({
+          search: validated.query,
+          perPage: validated.per_page || 10,
+        });
+        const topics = results.results?.map(summarizeTopic) || [];
+        return {
+          content: [
+            {
+              type: 'text',
+              text: JSON.stringify({
+                meta: {
+                  count: results.meta?.count,
+                  per_page: results.meta?.per_page,
+                },
+                topics,
+              }, null, 2),
             },
           ],
         };

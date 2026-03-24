@@ -133,3 +133,77 @@ describe('buildFilter topic ID support (via MCP handler)', () => {
     expect(filter).toContain('publication_year');
   });
 });
+
+describe('find_topics tool handler', () => {
+  let fetchSpy: ReturnType<typeof vi.fn>;
+
+  function mockFetchResponse(data: any) {
+    return { ok: true, status: 200, statusText: 'OK', json: () => Promise.resolve(data) };
+  }
+
+  beforeEach(() => {
+    fetchSpy = vi.fn();
+    vi.stubGlobal('fetch', fetchSpy);
+  });
+
+  afterEach(() => { vi.restoreAllMocks(); });
+
+  async function callTool(server: any, toolName: string, args: Record<string, any>) {
+    const handlers = (server as any)._requestHandlers;
+    const handler = handlers?.get('tools/call');
+    if (!handler) throw new Error('No tools/call handler found');
+    return handler({ method: 'tools/call', params: { name: toolName, arguments: args } });
+  }
+
+  it('should call /topics endpoint and return summarized topics', async () => {
+    const client = new OpenAlexClient({ email: 'test@test.com', enableCache: false });
+
+    fetchSpy.mockResolvedValue(mockFetchResponse({
+      meta: { count: 2, page: 1, per_page: 10 },
+      results: [
+        {
+          id: 'https://openalex.org/T10315',
+          display_name: 'Decision-Making and Behavioral Economics',
+          description: 'Focuses on decision-making processes',
+          works_count: 84521,
+          subfield: { display_name: 'Applied Psychology' },
+          field: { display_name: 'Psychology' },
+          domain: { display_name: 'Social Sciences' },
+          keywords: [], siblings: [],
+        },
+        {
+          id: 'https://openalex.org/T11234',
+          display_name: 'Consumer Behavior',
+          description: 'Studies of consumer choices',
+          works_count: 42000,
+          subfield: { display_name: 'Marketing' },
+          field: { display_name: 'Business' },
+          domain: { display_name: 'Social Sciences' },
+          keywords: [], siblings: [],
+        },
+      ],
+    }));
+
+    const server = createServer(client, 10);
+    const result = await callTool(server, 'find_topics', { query: 'behavioral economics' });
+
+    // Verify it called /topics
+    const url = new URL(fetchSpy.mock.calls[0][0]);
+    expect(url.pathname).toBe('/topics');
+    expect(url.searchParams.get('search')).toBe('behavioral economics');
+
+    // Verify response structure
+    const parsed = JSON.parse(result.content[0].text);
+    expect(parsed.meta.count).toBe(2);
+    expect(parsed.topics).toHaveLength(2);
+    expect(parsed.topics[0]).toEqual({
+      id: 'https://openalex.org/T10315',
+      display_name: 'Decision-Making and Behavioral Economics',
+      description: 'Focuses on decision-making processes',
+      works_count: 84521,
+      subfield: 'Applied Psychology',
+      field: 'Psychology',
+      domain: 'Social Sciences',
+    });
+  });
+});
