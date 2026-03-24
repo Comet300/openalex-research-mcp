@@ -1687,20 +1687,61 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
       }
 
       case 'search_by_topic': {
-        const filter = buildFilter(params);
+        const { searchByTopicSchema } = await import('./validation.js');
+        const validated = validateInput(searchByTopicSchema, params, 'search_by_topic');
+        const filter = buildFilter(validated);
+
+        let resolvedTopic: { id: string; name: string } | null = null;
+        let candidateTopics: { id: string; name: string }[] = [];
+        let topicMatch: 'direct' | 'auto_resolved' | 'none' = 'none';
+
+        // Step 1: Determine topic filter
+        if (validated.topic_id || validated.primary_topic_id) {
+          // Direct topic ID provided — skip auto-discovery
+          topicMatch = 'direct';
+        } else {
+          // Auto-discover topic from text
+          try {
+            const topicResults = await openAlexClient.getTopics({
+              search: validated.topic,
+              perPage: 5,
+            });
+            candidateTopics = (topicResults.results || []).map((t: any) => ({
+              id: t.id,
+              name: t.display_name,
+            }));
+
+            if (candidateTopics.length > 0) {
+              resolvedTopic = candidateTopics[0];
+              filter['primary_topic.id'] = resolvedTopic.id;
+              topicMatch = 'auto_resolved';
+            }
+          } catch (error) {
+            // Topic resolution failed — fall back to free-text
+            console.error('Topic auto-resolution failed:', error);
+          }
+        }
+
+        // Step 2: Search works
         const options: SearchOptions = {
-          search: params.topic,
+          search: validated.topic,
           filter,
-          sort: params.sort || 'relevance_score',
-          perPage: params.per_page || defaultPageSize,
+          sort: validated.sort || 'relevance_score',
+          perPage: validated.per_page || defaultPageSize,
         };
         const results = await openAlexClient.getWorks(options);
         const summary = summarizeWorksList(results);
+
         return {
           content: [
             {
               type: 'text',
-              text: JSON.stringify(summary, null, 2),
+              text: JSON.stringify({
+                topic_match: topicMatch,
+                resolved_topic: resolvedTopic,
+                candidate_topics: candidateTopics,
+                ...summary,
+              }, null, 2),
             },
           ],
         };
