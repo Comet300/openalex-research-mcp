@@ -594,7 +594,7 @@ const tools: Tool[] = [
   {
     name: 'search_works',
     description:
-      'Search scholarly works with advanced filtering. Supports Boolean operators, year ranges, citation thresholds, venue/journal filtering (source_name, source_issn, source_id), and institution filtering (author_institution, institution_group). The most flexible search tool. Use search_in_journal_list for preset journal lists like UTD24 or FT50.',
+      'Search scholarly works with advanced filtering. For domain-specific queries, first use find_topics to get a topic ID, then pass it as topic_id for precise results. Supports Boolean operators, year ranges, citation thresholds, venue/journal filtering (source_name, source_issn, source_id), and institution filtering (author_institution, institution_group). The most flexible search tool. Use search_in_journal_list for preset journal lists like UTD24 or FT50.',
     inputSchema: {
       type: 'object',
       properties: {
@@ -709,7 +709,7 @@ const tools: Tool[] = [
   {
     name: 'search_by_topic',
     description:
-      'Search for works within specific research topics or domains. Use this to explore literature in a particular field or subfield. Supports venue filtering to restrict results to top journals/conferences.',
+      'Search for works within specific research topics. Automatically resolves topic names to OpenAlex topic IDs for precise filtering — much more accurate than keyword search alone. Pass topic_id directly if you already have it from find_topics. Supports venue filtering to restrict results to top journals/conferences.',
     inputSchema: {
       type: 'object',
       properties: {
